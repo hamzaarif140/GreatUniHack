@@ -1,0 +1,33 @@
+{
+  "name": "guh",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint",
+    "server": "tsx watch --env-file-if-exists=.env server/index.ts",
+    "server:start": "tsx --env-file-if-exists=.env server/index.ts",
+    "test": "tsx --test server/*.test.ts",
+    "check": "tsx --env-file-if-exists=.env server/check.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.6.0",
+    "next": "16.4.5",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-icons": "^5.7.0",
+    "ws": "^8.22.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "@types/ws": "^8.18.2",
+    "eslint": "^9",
+    "eslint-config-next": "16.4.5",
+    "tsx": "^4.23.15",
+    "typescript": "^5"
+  }
+}

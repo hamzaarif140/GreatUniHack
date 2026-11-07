@@ -1,0 +1,253 @@
+.tile {
+  position: relative;
+  container-type: size;
+  flex: none;
+  overflow: hidden;
+  border-radius: 20px;
+  background: radial-gradient(
+    circle,
+    color-mix(in srgb, var(--c) 68%, #000),
+    color-mix(in srgb, var(--c) 50%, #000)
+  );
+  color: #fff;
+}
+
+/* Sits above the video so the highlight stays visible on a live camera. */
+.tile::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 3px solid transparent;
+  pointer-events: none;
+  transition: border-color 150ms;
+}
+
+.tile[data-speaking="true"]::after {
+  border-color: var(--speaking);
+}
+
+.center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.avatarWrap {
+  position: relative;
+  display: block;
+  /* Scales with the tile: 24% of its height, like the reference, but never tiny. */
+  --size: clamp(40px, 24cqh, 160px);
+  width: var(--size);
+  height: var(--size);
+}
+
+.avatarWrap .avatar {
+  position: relative;
+}
+
+.pulse {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--c);
+  opacity: 0.45;
+  animation: pulse 1.3s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    transform: scale(1.08);
+  }
+  50% {
+    transform: scale(1.3);
+  }
+}
+
+/* Absolute so that appearing doesn't push the avatar off centre. */
+.thinking {
+  position: absolute;
+  top: calc(50% + clamp(20px, 12cqh, 80px) + 10px);
+  display: flex;
+  gap: 5px;
+  padding: 7px 10px;
+  border-radius: 14px;
+  background: rgb(0 0 0 / 35%);
+}
+
+.thinking i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #fff;
+  animation: blink 1.2s ease-in-out infinite;
+}
+
+.thinking i:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.thinking i:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.hand {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--toggle-on);
+  color: var(--toggle-on-fg);
+  font-size: 18px;
+}
+
+.indicator {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  gap: 6px;
+}
+
+.muted,
+.bars {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+}
+
+.muted {
+  background: rgb(32 33 36 / 70%);
+  font-size: 18px;
+}
+
+.bars {
+  gap: 2px;
+  background: #1a73e8;
+}
+
+.bars i {
+  width: 3px;
+  height: 12px;
+  border-radius: 2px;
+  background: #fff;
+  transform-origin: center;
+  animation: bars 0.8s ease-in-out infinite;
+}
+
+.bars i:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.bars i:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes bars {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.label {
+  position: absolute;
+  left: 14px;
+  right: 14px;
+  bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  text-shadow: 0 1px 2px rgb(0 0 0 / 60%);
+}
+
+.name {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.badge {
+  flex: none;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: rgb(255 255 255 / 22%);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-shadow: none;
+}
+
+.actions {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  border-radius: 24px;
+  background: rgb(32 33 36 / 80%);
+  opacity: 0;
+  transition: opacity 120ms;
+}
+
+.tile:hover .actions,
+.actions:focus-within {
+  opacity: 1;
+}
+
+.actions button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  color: #fff;
+  font-size: 20px;
+}
+
+.actions button:hover {
+  background: rgb(255 255 255 / 15%);
+}
+
+@media (hover: none) {
+  .actions {
+    display: none;
+  }
+}

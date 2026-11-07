@@ -1,0 +1,7 @@
+.brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 20px;
+  color: var(--text-muted);
+}

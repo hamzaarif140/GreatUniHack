@@ -1,0 +1,75 @@
+:root {
+  --room-bg: #131314;
+  --control: #333537;
+  --control-hover: #434548;
+  --on-dark: #e3e3e3;
+  --on-dark-muted: #a8a9ad;
+  --danger: #dc362e;
+  --danger-hover: #c32d26;
+  --off-bg: #f9dedc;
+  --off-bg-hover: #f2cdca;
+  --off-fg: #601410;
+  --toggle-on: #a8c7fa;
+  --toggle-on-fg: #062e6f;
+  --accent: #0b57d0;
+  --accent-hover: #0a4cb8;
+  --speaking: #8ab4f8;
+  --surface: #ffffff;
+  --surface-alt: #f1f3f4;
+  --line: #e0e3e7;
+  --text: #1f1f1f;
+  --text-muted: #5f6368;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--surface);
+  color: var(--text);
+  font-family: var(--font-roboto), system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: 0;
+  background: none;
+}
+
+button:disabled {
+  cursor: default;
+}
+
+a {
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--speaking);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

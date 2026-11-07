@@ -1,0 +1,412 @@
+.room {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--room-bg);
+  color: var(--on-dark);
+}
+
+.topBar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+  padding: 0 16px 0 20px;
+}
+
+.meetingInfo {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.divider {
+  width: 1px;
+  height: 16px;
+  background: #80868b;
+}
+
+.code {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.infoButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin-left: -6px;
+  border-radius: 50%;
+  font-size: 20px;
+}
+
+.infoButton:hover {
+  background: rgb(255 255 255 / 10%);
+}
+
+.peopleButton {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 40px;
+  padding: 0 14px 0 4px;
+  border-radius: 20px;
+  background: #27282b;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.peopleButton:hover {
+  background: var(--control);
+}
+
+.peopleButton[data-active="true"] {
+  background: var(--toggle-on);
+  color: var(--toggle-on-fg);
+}
+
+.avatarStack {
+  display: flex;
+}
+
+.avatarStack > * {
+  box-shadow: 0 0 0 2px #27282b;
+}
+
+.avatarStack > * + * {
+  margin-left: -10px;
+}
+
+.teachBar {
+  flex: none;
+  align-self: center;
+  display: flex;
+  align-items: center;
+  width: min(760px, calc(100% - 32px));
+  margin-top: 12px;
+  padding: 2px 4px;
+  border-radius: 24px;
+  background: var(--control);
+}
+
+.teachBar input:first-child {
+  padding-left: 16px;
+}
+
+.teachBar .talkButton {
+  margin-right: 6px;
+  background: #434548;
+  color: var(--on-dark);
+  touch-action: none;
+  user-select: none;
+}
+
+.teachBar .talkButton:hover:not(:disabled) {
+  background: #54565a;
+}
+
+.teachBar .talkButton[data-listening="true"] {
+  background: var(--danger);
+  color: #fff;
+}
+
+.teachBar:focus-within {
+  box-shadow: 0 0 0 2px var(--speaking);
+}
+
+.teachBar input {
+  flex: 1;
+  min-width: 0;
+  height: 42px;
+  border: 0;
+  outline: 0;
+  background: none;
+}
+
+.teachBar input::placeholder {
+  color: var(--on-dark-muted);
+}
+
+.teachBar button {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  font-size: 22px;
+  color: var(--toggle-on);
+}
+
+.teachBar button:disabled {
+  color: #80868b;
+}
+
+.teachBar button:hover:not(:disabled) {
+  background: rgb(255 255 255 / 10%);
+}
+
+.toastCoach {
+  flex: none;
+  margin-left: 4px;
+  font-size: 22px;
+  color: #fdd663;
+}
+
+.ending {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  padding: 24px;
+  text-align: center;
+}
+
+.ending h1 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 400;
+}
+
+.ending p {
+  margin: 0;
+  color: var(--text-muted);
+}
+
+.ending a {
+  color: var(--accent);
+}
+
+.spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid var(--line);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 900ms linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.connectionBanner {
+  flex: none;
+  align-self: center;
+  margin: 0 16px 8px;
+  padding: 6px 14px;
+  border-radius: 16px;
+  background: #2a2b2e;
+  font-size: 13px;
+}
+
+.content {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  padding: 0 16px;
+}
+
+.stage {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.reactions {
+  position: absolute;
+  left: 24px;
+  bottom: 0;
+  height: 70%;
+  width: 180px;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.reaction {
+  position: absolute;
+  bottom: 0;
+  left: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  animation: floatUp 3.2s ease-out forwards;
+}
+
+@keyframes floatUp {
+  0% {
+    transform: translate(0, 20px) scale(0.6);
+    opacity: 0;
+  }
+  10% {
+    transform: translate(0, 0) scale(1);
+    opacity: 1;
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--drift), -420px);
+    opacity: 0;
+  }
+}
+
+.reactionEmoji {
+  font-size: 36px;
+  line-height: 1;
+}
+
+.reactionName {
+  max-width: 120px;
+  padding: 2px 8px;
+  overflow: hidden;
+  border-radius: 10px;
+  background: rgb(32 33 36 / 85%);
+  font-size: 12px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* Toasts stack above captions, so the two can never cover each other. */
+.overlays {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 6;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.captions {
+  align-self: center;
+  display: flex;
+  gap: 12px;
+  width: min(760px, 100%);
+  padding: 12px 16px;
+  border-radius: 12px;
+  background: rgb(19 19 20 / 88%);
+  backdrop-filter: blur(4px);
+}
+
+.captions strong {
+  display: block;
+  margin-bottom: 2px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--on-dark-muted);
+}
+
+.captions p {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.4;
+  color: #fff;
+}
+
+.toasts {
+  align-self: flex-start;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  max-width: min(340px, 100%);
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: 100%;
+  padding: 8px 14px 8px 8px;
+  border-radius: 12px;
+  background: #2a2b2e;
+  color: var(--on-dark);
+  box-shadow: 0 2px 10px rgb(0 0 0 / 40%);
+  font-size: 13px;
+  text-align: left;
+  pointer-events: auto;
+  animation: toastIn 160ms ease-out;
+}
+
+button.toast:hover {
+  background: #36373b;
+}
+
+@keyframes toastIn {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+}
+
+.toastText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.35;
+}
+
+.toastText strong {
+  font-weight: 500;
+}
+
+.toastBody {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  color: var(--on-dark-muted);
+}
+
+.toastError {
+  flex: none;
+  margin-left: 4px;
+  font-size: 20px;
+  color: #f2b8b5;
+}
+
+.toastClose {
+  flex: none;
+  display: flex;
+  margin-right: -6px;
+  padding: 4px;
+  border-radius: 50%;
+  font-size: 18px;
+}
+
+.toastClose:hover {
+  background: rgb(255 255 255 / 12%);
+}
+
+@media (max-width: 820px) {
+  .topBar {
+    height: 48px;
+    padding: 0 8px 0 14px;
+  }
+
+  .content {
+    padding: 0 8px;
+  }
+
+  .captions p {
+    font-size: 15px;
+  }
+}

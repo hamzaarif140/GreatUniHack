@@ -1,0 +1,53 @@
+.left {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  padding: 24px;
+  text-align: center;
+}
+
+.left h1 {
+  margin: 0;
+  font-size: 34px;
+  font-weight: 400;
+}
+
+.leftActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.rejoin,
+.home {
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 24px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.rejoin {
+  border: 1px solid #80868b;
+  color: var(--accent);
+}
+
+.rejoin:hover {
+  background: #e8f0fe;
+}
+
+.home {
+  background: var(--accent);
+  color: #fff;
+}
+
+.home:hover {
+  background: var(--accent-hover);
+}
