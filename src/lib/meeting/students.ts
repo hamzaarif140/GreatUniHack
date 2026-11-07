@@ -11,6 +11,13 @@ export interface StudentPersona extends AgentProfile {
   confusionSignal: string;
   /** Starting understanding, 0-100, before the difficulty adjustment. */
   baseScore: number;
+  /**
+   * How able they are in this subject, 1-5, separate from what they know today.
+   * It sets how fast they learn and how deeply they can reason.
+   */
+  aptitude: Aptitude;
+  /** How they reason at that level, for the model to play. */
+  thinking: string;
   /** 0-1: how readily they speak up without being asked. */
   eagerness: number;
   /** Which of a topic's misconceptions this student tends to hold. */
@@ -20,6 +27,17 @@ export interface StudentPersona extends AgentProfile {
   /** Scripted lines by understanding, used when no model is connected. */
   lines: { low: string[]; mid: string[]; high: string[] };
 }
+
+export type Aptitude = 1 | 2 | 3 | 4 | 5;
+
+/** Score gains are scaled by aptitude, and so are losses, the other way. */
+export const LEARNING_RATE: Record<Aptitude, { gain: number; loss: number }> = {
+  1: { gain: 0.5, loss: 1.4 },
+  2: { gain: 0.75, loss: 1.2 },
+  3: { gain: 1, loss: 1 },
+  4: { gain: 1.25, loss: 0.85 },
+  5: { gain: 1.5, loss: 0.7 },
+};
 
 export const STUDENTS: StudentPersona[] = [
   {
@@ -32,6 +50,9 @@ export const STUDENTS: StudentPersona[] = [
     speakingStyle: "Direct and casual. States things as facts rather than asking.",
     confusionSignal: "He doesn't show it. He states a wrong idea with confidence and may push back when corrected.",
     baseScore: 55,
+    aptitude: 2,
+    thinking:
+      "Pattern-matches from things he has built rather than reasoning it through. Gets the surface right and the deeper why wrong, struggles to generalise to a new case, and rarely spots his own mistakes.",
     eagerness: 0.9,
     misconceptionIndex: 0,
     voice: { gender: "male", pitch: 0.9, rate: 1.1 },
@@ -60,6 +81,9 @@ export const STUDENTS: StudentPersona[] = [
     speakingStyle: "Short, hesitant replies with trailing sentences. Mostly speaks when asked directly.",
     confusionSignal: "Vague agreement such as \"yeah, I think so\", or long pauses. She doesn't say outright that she's lost.",
     baseScore: 30,
+    aptitude: 3,
+    thinking:
+      "Average pace. Slow to start on new material, but solid once it clicks: she can follow a clear step-by-step explanation and apply it to a similar example.",
     eagerness: 0.1,
     misconceptionIndex: 1,
     voice: { gender: "female", pitch: 1.1, rate: 0.9 },
@@ -84,7 +108,10 @@ export const STUDENTS: StudentPersona[] = [
     personality: "Warm, curious and easily sidetracked. He's enthusiastic, and his tangents are sometimes useful.",
     speakingStyle: "Chatty and full of \"oh, that reminds me\". Tends to wander from the point.",
     confusionSignal: "He changes the subject to something he's more comfortable with.",
-    baseScore: 45,
+    baseScore: 25,
+    aptitude: 1,
+    thinking:
+      "Finds abstract ideas hard. Thinks in concrete, everyday terms, uses simple words, follows one step at a time, and can say he gets something when he has missed the point. Needs several concrete examples before an idea clicks.",
     eagerness: 0.6,
     misconceptionIndex: 2,
     voice: { gender: "male", pitch: 1.05, rate: 1.15 },
@@ -112,7 +139,10 @@ export const STUDENTS: StudentPersona[] = [
     personality: "Precise, curious and polite. She has a strong technical base and likes things to be exact.",
     speakingStyle: "Clear, correct English. Asks what an idiom or informal phrase means, and connects ideas to maths.",
     confusionSignal: "She asks what a phrase means, or restates the idea formally to check it.",
-    baseScore: 50,
+    baseScore: 60,
+    aptitude: 4,
+    thinking:
+      "Quick and rigorous. Picks up formal ideas fast, connects them to maths she knows, and notices imprecise wording or a definition that doesn't quite hold.",
     eagerness: 0.4,
     misconceptionIndex: 0,
     voice: { gender: "female", pitch: 1, rate: 1 },
@@ -140,7 +170,10 @@ export const STUDENTS: StudentPersona[] = [
     personality: "Sharp, direct and respectful. She's usually ahead of the class and expects good reasons for things.",
     speakingStyle: "Asks pointed follow-up questions about edge cases and failure modes.",
     confusionSignal: "She asks a precise question about exactly the part that doesn't add up.",
-    baseScore: 70,
+    baseScore: 80,
+    aptitude: 5,
+    thinking:
+      "The sharpest in the room. Grasps ideas almost at once, reasons several steps ahead, spots gaps and edge cases, and may anticipate where the lecturer is going. Gets restless with slow or vague explanations.",
     eagerness: 0.7,
     misconceptionIndex: 2,
     voice: { gender: "female", pitch: 0.85, rate: 1.05 },

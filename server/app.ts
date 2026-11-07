@@ -23,6 +23,8 @@ export interface MeetingServerOptions {
   autoJoinIds?: string[];
   /** Hosted student voices. Without them, browsers use their built-in voices. */
   voices?: ElevenLabsVoices;
+  /** Source of chance for chaotic classes, replaceable in tests. */
+  random?: () => number;
 }
 
 export function createMeetingServer(options: MeetingServerOptions) {
@@ -36,6 +38,12 @@ export function createMeetingServer(options: MeetingServerOptions) {
     }
     const speech = request.url?.match(/^\/speech\/([\w-]+)$/);
     if (speech && request.method === "GET" && options.voices) {
+      // Lets the class page read the audio's loudness for its speaking visualiser.
+      const origin = request.headers.origin;
+      if (origin && options.allowedOrigins.includes(origin)) {
+        response.setHeader("access-control-allow-origin", origin);
+        response.setHeader("vary", "origin");
+      }
       void options.voices.stream(speech[1], response);
       return;
     }
@@ -61,6 +69,7 @@ export function createMeetingServer(options: MeetingServerOptions) {
       limits: options.limits,
       autoJoinIds: options.autoJoinIds,
       speech: options.voices,
+      random: options.random,
       onEmpty: () => {
         room.destroy();
         rooms.delete(code);

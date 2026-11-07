@@ -201,4 +201,6 @@ export type ClientCommand =
   | { type: "agent.invite"; agentId: string }
   | { type: "agent.remove"; id: string }
   | { type: "agent.setMuted"; id: string; muted: boolean }
+  /** Call on a student whose hand is up, so they say what they raised it for. */
+  | { type: "agent.callOn"; id: string }
   | { type: "agents.muteAll" };

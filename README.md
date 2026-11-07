@@ -56,13 +56,15 @@ Both stay on the server. The browser only receives short-lived, single-use trans
 
 All are fictional. Personas are in `src/lib/meeting/students.ts`.
 
-| Student | Background | In class |
-| --- | --- | --- |
-| Marcus | Coding bootcamp graduate | Confident, and often wrong |
-| Priya | Switched from biology | Quiet, and hides being lost behind "yeah, I think so" |
-| Leo | Former music producer | Warm, and goes off-topic |
-| Ana | Electrical engineer from Brazil | Strong maths, fluent English, asks about idioms |
-| Samira | Six years in IT support | Sharp, and asks about edge cases |
+| Student | Background | In class | Ability (1-5) |
+| --- | --- | --- | --- |
+| Marcus | Coding bootcamp graduate | Confident, and often wrong | 2: pattern-matches, shallow on the why |
+| Priya | Switched from biology | Quiet, and hides being lost behind "yeah, I think so" | 3: slow start, solid once it clicks |
+| Leo | Former music producer | Warm, and goes off-topic | 1: concrete thinker, needs several examples |
+| Ana | Electrical engineer from Brazil | Strong maths, fluent English, asks about idioms | 4: quick and rigorous |
+| Samira | Six years in IT support | Sharp, and asks about edge cases | 5: reasons ahead, bored by vagueness |
+
+Ability is separate from what a student knows at the start. It scales how fast their understanding rises and falls, and how deeply they reason.
 
 ## Controlling cost
 

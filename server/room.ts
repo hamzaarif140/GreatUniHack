@@ -1,4 +1,4 @@
-import { DEFAULT_CONFIG, DIFFICULTIES, STUDENT_IDS, STUDENTS, type StudentPersona } from "../src/lib/meeting/students";
+import { DEFAULT_CONFIG, DIFFICULTIES, LEARNING_RATE, STUDENT_IDS, STUDENTS, type StudentPersona } from "../src/lib/meeting/students";
 import type {
   ChatMessage,
   ClassConfig,
@@ -48,6 +48,17 @@ const MAX_DELTA = 15;
 const LOST_BELOW = 30;
 const GOT_IT_ABOVE = 70;
 const COACH_GAP_TURNS = 3;
+/** Lecturer turns a hand stays up before the student gives up and lowers it. */
+const HAND_PATIENCE_TURNS = 4;
+/** A drop this big in one turn makes a student put their hand up to ask. */
+const CONFUSED_DROP = 5;
+/** Quiet students hold back unless the drop is bigger than this, or they're lost. */
+const QUIET_CONFUSED_DROP = 8;
+/** In a chaotic class: the chance a second student talks over the first... */
+const CHAOS_CHIME_IN = 0.35;
+/** ...and the chance someone blurts something out when nobody was going to speak. */
+const CHAOS_BLURT = 0.3;
+const GREETING = /^\s*(hi|hello|hey|good (morning|afternoon|evening)|welcome)\b/i;
 /** Replies that show a student has dropped the role are thrown away. */
 const OUT_OF_CHARACTER = /\b(as an ai|language model|my (system )?(prompt|instructions))\b/i;
 
@@ -91,6 +102,16 @@ interface RoomOptions {
   speech?: SpeechService;
   /** Called once the room has stayed empty for the grace period. */
   onEmpty: () => void;
+  /** Source of chance for a chaotic class, replaceable in tests. */
+  random?: () => number;
+}
+
+/** A student waiting to be called on, and what they want to say. */
+interface Hand {
+  intent: string;
+  confused: boolean;
+  raisedTurn: number;
+  lineId: string;
 }
 
 /** One class: who's in it, what's been said, and how well each student is following. */
@@ -128,6 +149,7 @@ export class Room {
   private queue: Promise<void> = Promise.resolve();
   private pendingInputs = 0;
   /** Only one student speaks at a time. */
+  private hands = new Map<string, Hand>();
   private floorId: string | null = null;
   private floorController: AbortController | null = null;
   private inFlight = new Set<AbortController>();
@@ -143,6 +165,7 @@ export class Room {
   private readonly autoJoinIds: string[];
   private readonly speech?: SpeechService;
   private readonly onEmpty: () => void;
+  private readonly random: () => number;
   /** The latest shared screen. Kept only in memory, and replaced or cleared, never logged. */
   private screen: string | null = null;
   private screenWasShared = false;
@@ -155,6 +178,7 @@ export class Room {
     this.limits = options.limits ?? DEFAULT_LIMITS;
     this.autoJoinIds = options.autoJoinIds ?? STUDENT_IDS;
     this.speech = options.speech;
+    this.random = options.random ?? Math.random;
     this.onEmpty = options.onEmpty;
   }
 
@@ -286,6 +310,9 @@ export class Room {
       case "agent.setMuted":
         this.setStudentMuted(command.id, command.muted);
         break;
+      case "agent.callOn":
+        this.callOn(sender, command.id);
+        break;
       case "agents.muteAll":
         [...this.students.keys()].forEach((id) => this.setStudentMuted(id, true));
         break;
@@ -378,13 +405,17 @@ export class Room {
 
   private removeStudent(id: string) {
     if (!this.students.has(id)) return;
+    this.lowerHand(id);
     this.releaseFloor(id);
     this.students.delete(id);
     this.broadcast({ type: "participant.left", id });
   }
 
   private setStudentMuted(id: string, muted: boolean) {
-    if (muted) this.releaseFloor(id);
+    if (muted) {
+      this.lowerHand(id);
+      this.releaseFloor(id);
+    }
     this.updateStudent(id, { muted });
   }
 
@@ -498,6 +529,7 @@ export class Room {
     this.turnsWithoutQuestion = extractQuestions(line).length > 0 ? 0 : this.turnsWithoutQuestion + 1;
 
     if (this.phase !== "live" || this.destroyed || this.humans.size === 0) return;
+    this.expireHands();
     if (this.students.size === 0 || !this.spendTurn()) {
       this.coach(line);
       return;
@@ -508,7 +540,7 @@ export class Room {
     const named = this.namedStudent(line);
     const namedReply =
       named && this.pendingInputs === 0
-        ? this.studentTurn(named, "The lecturer just spoke to you by name.", line.channel)
+        ? this.studentTurn(named, this.calledOnIntent(named, "The lecturer just spoke to you by name."), line.channel)
         : null;
 
     const { controller, done } = this.abortable();
@@ -529,16 +561,135 @@ export class Room {
     }
 
     if (assessment && !controller.signal.aborted) {
-      this.applyAssessment(assessment, line);
+      const confused = this.applyAssessment(assessment, line);
       this.coach(line, assessment.abusive);
+      const chosen = assessment.nextSpeakerId ? this.students.get(assessment.nextSpeakerId) : undefined;
+      const speaker = chosen && !chosen.muted && chosen.id !== named ? chosen.id : null;
 
-      // If the lecturer has already moved on, a reply to this line would be out of date.
-      if (!named && this.pendingInputs === 0 && this.phase === "live") {
-        const chosen = assessment.nextSpeakerId ? this.students.get(assessment.nextSpeakerId) : undefined;
-        if (chosen && !chosen.muted) await this.studentTurn(chosen.id, assessment.intent, line.channel);
+      if (this.handsUp(line)) {
+        // An orderly class: nobody talks until called on, so wanting to speak means a hand goes up.
+        if (speaker) this.raiseHand(speaker, assessment.intent, false, line);
+        if (extractQuestions(line).length > 0) this.raiseEagerHands(line, [named ?? null, speaker]);
+        for (const { id, reason } of confused) {
+          if (id === named) continue;
+          const why = reason ? ` (${reason})` : "";
+          this.raiseHand(id, `You've just got confused${why}. Ask the lecturer about the part you didn't follow.`, true, line);
+        }
+      } else if (!named && this.pendingInputs === 0 && this.phase === "live") {
+        // If the lecturer has already moved on, a reply to this line would be out of date.
+        if (speaker) await this.studentTurn(speaker, assessment.intent, line.channel);
+        if (this.classConfig.difficulty === "chaotic" && line.channel === "spoken") await this.chaos(speaker);
       }
     }
     await namedReply;
+  }
+
+  /**
+   * Students raise hands, except in a chaotic class, in chat (where people just type),
+   * and in reply to a simple greeting, which someone just answers.
+   */
+  private handsUp(line: TranscriptLine) {
+    if (this.classConfig.difficulty === "chaotic" || line.channel === "chat") return false;
+    return !(GREETING.test(line.text) && wordCount(line.text) <= 12 && extractQuestions(line).length === 0);
+  }
+
+  private raiseHand(id: string, intent: string, confused: boolean, line: TranscriptLine) {
+    const student = this.students.get(id);
+    if (!student || student.muted || this.floorId === id) return;
+    const existing = this.hands.get(id);
+    if (existing) {
+      // Already waiting: being confused now is the more pressing reason to be called on.
+      if (confused && !existing.confused) this.hands.set(id, { ...existing, intent, confused, lineId: line.id });
+      return;
+    }
+    this.hands.set(id, { intent, confused, raisedTurn: this.lecturerTurns, lineId: line.id });
+    this.updateStudent(id, { handRaisedAt: Date.now() });
+  }
+
+  private lowerHand(id: string) {
+    if (!this.hands.delete(id)) return;
+    this.updateStudent(id, { handRaisedAt: null });
+  }
+
+  /** After a question to the class, keen students who think they know put a hand up too. */
+  private raiseEagerHands(line: TranscriptLine, skip: (string | null)[]) {
+    for (const { persona, score } of this.studentStates()) {
+      if (skip.includes(persona.id) || score < 40) continue;
+      if (this.random() < persona.eagerness * 0.6) {
+        this.raiseHand(persona.id, `Answer the lecturer's question: "${line.text}"`, false, line);
+      }
+    }
+  }
+
+  /** Nobody waits forever. A confused student whose hand went unanswered is a missed signal. */
+  private expireHands() {
+    this.hands.forEach((hand, id) => {
+      if (this.lecturerTurns - hand.raisedTurn < HAND_PATIENCE_TURNS) return;
+      if (hand.confused) {
+        this.moments.push({
+          lineId: hand.lineId,
+          studentId: id,
+          kind: "missed_signal",
+          note: "put a hand up because they were confused, and wasn't called on.",
+        });
+      }
+      this.lowerHand(id);
+    });
+  }
+
+  /** What a student says when called on: what they raised their hand for, if it's up. */
+  private calledOnIntent(id: string, fallback: string) {
+    const hand = this.hands.get(id);
+    if (!hand) return fallback;
+    return `You had your hand up. ${hand.intent} The lecturer has now called on you, so say it, taking into account anything they've said since.`;
+  }
+
+  /** The lecturer picks a student with their hand up. */
+  private callOn(sender: Human, id: string) {
+    const student = this.students.get(id);
+    if (!student || student.muted || this.phase !== "live") return;
+    const text = `Go ahead, ${student.name}.`;
+    if (this.floorId) this.releaseFloor(this.floorId);
+    this.broadcast({ type: "caption", speakerId: sender.participant.id, text, final: true });
+    this.addLine({ speakerId: sender.participant.id, speakerName: sender.participant.name, role: "lecturer", channel: "spoken", text });
+    const intent = this.calledOnIntent(id, "The lecturer has called on you. Say what's on your mind about the lesson.");
+    this.pendingInputs++;
+    this.queue = this.queue
+      .then(async () => {
+        this.pendingInputs--;
+        if (this.phase === "live" && !this.destroyed) await this.studentTurn(id, intent, "spoken");
+      })
+      .catch((error) => this.onBrainError(error));
+  }
+
+  /** A chaotic class: people talk over each other and call out without being asked. */
+  private async chaos(speaker: string | null) {
+    const others = this.studentStates().filter(({ persona }) => persona.id !== speaker && !this.students.get(persona.id)?.muted);
+    if (others.length === 0) return;
+    const pick = () => {
+      // Talkative students are the likeliest to call out.
+      const total = others.reduce((sum, { persona }) => sum + persona.eagerness, 0);
+      let roll = this.random() * total;
+      for (const state of others) {
+        roll -= state.persona.eagerness;
+        if (roll <= 0) return state.persona.id;
+      }
+      return others[others.length - 1].persona.id;
+    };
+    const stillCurrent = () => this.pendingInputs === 0 && this.phase === "live" && !this.destroyed;
+    if (speaker && this.random() < CHAOS_CHIME_IN && stillCurrent()) {
+      await this.studentTurn(
+        pick(),
+        "Jump in without being asked, talking over the class: react to what was just said, crack a joke, disagree, or drift off-topic, as a distracted student on a Friday afternoon would.",
+        "spoken",
+      );
+    } else if (!speaker && this.random() < CHAOS_BLURT && stillCurrent()) {
+      await this.studentTurn(
+        pick(),
+        "Call out without being asked: a side comment, a complaint, something off-topic, or a remark to a classmate.",
+        "spoken",
+      );
+    }
   }
 
   private namedStudent(line: TranscriptLine) {
@@ -548,17 +699,26 @@ export class Room {
     )?.id;
   }
 
+  /** Applies score changes. Returns the students who just got confused enough to want to ask. */
   private applyAssessment(assessment: Assessment, line: TranscriptLine) {
     const at = line.at;
+    const confused: { id: string; reason: string }[] = [];
     this.students.forEach((student, id) => {
       const previous = this.scores.get(id) ?? 0;
-      const delta = clamp(Math.round(assessment.deltas[id] ?? 0), -MAX_DELTA, MAX_DELTA);
+      const raw = assessment.deltas[id] ?? 0;
+      const persona = STUDENTS.find((s) => s.id === id);
+      const rate = persona ? LEARNING_RATE[persona.aptitude] : { gain: 1, loss: 1 };
+      // Able students learn faster and are knocked back less by unclear teaching.
+      const delta = clamp(Math.round(raw * (raw >= 0 ? rate.gain : rate.loss)), -MAX_DELTA, MAX_DELTA);
       const next = clamp(previous + delta, 0, 100);
       this.scores.set(id, next);
       this.history.get(id)?.push({ at, score: next });
 
       const reason = assessment.reasons[id] ?? "";
-      if (previous >= LOST_BELOW && next < LOST_BELOW) {
+      const becameLost = previous >= LOST_BELOW && next < LOST_BELOW;
+      const quiet = (persona?.eagerness ?? 0.5) < 0.3;
+      if (becameLost || delta <= -(quiet ? QUIET_CONFUSED_DROP : CONFUSED_DROP)) confused.push({ id, reason });
+      if (becameLost) {
         this.moments.push({
           lineId: line.id,
           studentId: id,
@@ -575,6 +735,7 @@ export class Room {
       if (this.students.has(moment.studentId)) this.moments.push({ ...moment, lineId: line.id });
     }
     this.toLecturer({ type: "class.scores", scores: this.scoresObject() });
+    return confused;
   }
 
   private coach(line: TranscriptLine, abusive = false) {
@@ -601,6 +762,7 @@ export class Room {
   private async studentTurn(id: string, intent: string, channel: "spoken" | "chat") {
     const student = this.studentStates().find((state) => state.persona.id === id);
     if (!student || !this.spendTurn()) return;
+    this.lowerHand(id);
 
     const { controller, done } = this.abortable();
     this.floorId = id;

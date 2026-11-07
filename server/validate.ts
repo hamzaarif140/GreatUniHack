@@ -94,6 +94,7 @@ export function parseCommand(value: unknown): ClientCommand | null {
     case "agent.invite":
       return isShortString(value.agentId, 64) ? { type: value.type, agentId: value.agentId } : null;
     case "agent.remove":
+    case "agent.callOn":
       return isShortString(value.id, 64) ? { type: value.type, id: value.id } : null;
     case "agent.setMuted":
       return isShortString(value.id, 64) && typeof value.muted === "boolean"

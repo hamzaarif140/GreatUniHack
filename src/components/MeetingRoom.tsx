@@ -23,6 +23,7 @@ import {
 } from "react-icons/md";
 import type { LocalMedia } from "@/lib/media/useLocalMedia";
 import type { ClassConfig, LocalUser, Participant } from "@/lib/meeting/types";
+import { moodFor, type Mood } from "@/lib/meeting/mood";
 import { useMeeting } from "@/lib/meeting/useMeeting";
 import { useClock } from "@/lib/useClock";
 import { useScreenFrames } from "@/lib/media/useScreenFrames";
@@ -68,7 +69,7 @@ export function MeetingRoom({ code, localUser, config, media, onLeave }: Meeting
   );
 
   const [panel, setPanelState] = useState<PanelId | null>(null);
-  const [layout, setLayout] = useState<Layout>("tiled");
+  const [layout, setLayout] = useState<Layout>("classroom");
   const [pinnedId, setPinnedId] = useState<string | null>(null);
   const [handRaisedAt, setHandRaisedAt] = useState<number | null>(null);
   const [captionsOn, setCaptionsOn] = useState(true);
@@ -205,6 +206,18 @@ export function MeetingRoom({ code, localUser, config, media, onLeave }: Meeting
   }, [toggleMic, toggleCam]);
 
   const participants = useMemo(() => [local, ...meeting.remote], [local, meeting.remote]);
+  // Moods come from the hidden scores, so only the lecturer sees them, and not in realistic mode.
+  const { scores, scoreChanges } = meeting;
+  const moods = useMemo(() => {
+    const out: Record<string, Mood> = {};
+    if (!isLecturer || !showInsights) return out;
+    for (const person of meeting.remote) {
+      if (person.kind !== "agent") continue;
+      const mood = moodFor(person.id, scores[person.id], scoreChanges[person.id]);
+      if (mood) out[person.id] = mood;
+    }
+    return out;
+  }, [isLecturer, showInsights, meeting.remote, scores, scoreChanges]);
   // A pinned student can leave. Treat the pin as gone rather than showing nothing.
   const activePin = participants.some((p) => p.id === pinnedId) ? pinnedId : null;
 
@@ -308,6 +321,9 @@ export function MeetingRoom({ code, localUser, config, media, onLeave }: Meeting
             layout={layout}
             pinnedId={activePin}
             lastSpeakerId={meeting.lastSpeakerId}
+            studentLevel={voices.level}
+            moods={moods}
+            micLevel={media.micLevel}
             presentingNote={
               meeting.engine === "live"
                 ? "You are presenting. The class can see this."
@@ -318,6 +334,7 @@ export function MeetingRoom({ code, localUser, config, media, onLeave }: Meeting
             onTogglePin={(id) => setPinnedId(activePin === id ? null : id)}
             onSetMuted={(id, value) => send({ type: "agent.setMuted", id, muted: value })}
             onRemove={(id) => send({ type: "agent.remove", id })}
+            onCallOn={isLecturer ? (id) => send({ type: "agent.callOn", id }) : undefined}
           />
 
           <div className={styles.reactions} aria-hidden="true">
@@ -505,7 +522,7 @@ export function MeetingRoom({ code, localUser, config, media, onLeave }: Meeting
         layout={activePin ? "spotlight" : layout}
         onLayout={(next) => {
           setLayout(next);
-          if (next === "tiled") setPinnedId(null);
+          if (next !== "spotlight") setPinnedId(null);
         }}
         isFullscreen={isFullscreen}
         onToggleFullscreen={toggleFullscreen}

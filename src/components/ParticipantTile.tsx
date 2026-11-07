@@ -9,6 +9,7 @@ import {
   MdPushPin,
   MdOutlinePushPin,
 } from "react-icons/md";
+import type { Mood } from "@/lib/meeting/mood";
 import type { Participant } from "@/lib/meeting/types";
 import { Avatar } from "./Avatar";
 import { VideoStream } from "./VideoStream";
@@ -18,12 +19,16 @@ export interface TileActions {
   onTogglePin: (id: string) => void;
   onSetMuted: (id: string, muted: boolean) => void;
   onRemove: (id: string) => void;
+  /** Calls on a student with a raised hand. Only the lecturer gets this. */
+  onCallOn?: (id: string) => void;
 }
 
 interface ParticipantTileProps extends TileActions {
   participant: Participant;
   isLocal: boolean;
   isPinned: boolean;
+  /** How a student is feeling, shown to the lecturer. */
+  mood?: Mood;
   stream?: MediaStream | null;
   style?: CSSProperties;
 }
@@ -32,11 +37,13 @@ export function ParticipantTile({
   participant,
   isLocal,
   isPinned,
+  mood,
   stream,
   style,
   onTogglePin,
   onSetMuted,
   onRemove,
+  onCallOn,
 }: ParticipantTileProps) {
   const { id, name, kind, color, muted, status, handRaisedAt, role } = participant;
   const speaking = status === "speaking" && !muted;
@@ -68,11 +75,22 @@ export function ParticipantTile({
         </div>
       )}
 
-      {handRaisedAt !== null && (
-        <span className={styles.hand} title="Hand raised">
-          <MdOutlinePanTool aria-label="Hand raised" />
-        </span>
-      )}
+      {handRaisedAt !== null &&
+        (onCallOn && isAgent ? (
+          <button
+            type="button"
+            className={styles.hand}
+            title={`Call on ${name}`}
+            aria-label={`${name} has a hand up. Call on ${name}`}
+            onClick={() => onCallOn(id)}
+          >
+            <MdOutlinePanTool />
+          </button>
+        ) : (
+          <span className={styles.hand} title="Hand raised">
+            <MdOutlinePanTool aria-label="Hand raised" />
+          </span>
+        ))}
 
       <span className={styles.indicator}>
         {muted && (
@@ -88,6 +106,12 @@ export function ParticipantTile({
           </span>
         )}
       </span>
+
+      {mood && (
+        <span className={styles.mood} role="img" aria-label={`Feeling ${mood.label}`} title={`Feeling ${mood.label}`}>
+          {mood.emoji}
+        </span>
+      )}
 
       <div className={styles.label}>
         <span className={styles.name} title={role ? `${name}, ${role}` : name}>

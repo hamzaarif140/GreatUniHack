@@ -44,6 +44,8 @@ interface MeetingState {
   config: ClassConfig;
   phase: ClassPhase;
   scores: Record<string, number>;
+  /** How much each score moved in the latest update, so moods can show a sudden change. */
+  scoreChanges: Record<string, number>;
   tips: CoachTip[];
   debrief: Debrief | null;
   speech: SpeechCue | null;
@@ -73,6 +75,7 @@ const initialState: MeetingState = {
   config: DEFAULT_CONFIG,
   phase: "live",
   scores: {},
+  scoreChanges: {},
   tips: [],
   debrief: null,
   speech: null,
@@ -101,6 +104,7 @@ function applyEvent(state: MeetingState, event: TransportEvent): MeetingState {
         config: event.config,
         phase: event.phase,
         scores: event.scores,
+        scoreChanges: {},
         tips: event.tips,
         debrief: event.debrief,
         caption: null,
@@ -112,8 +116,13 @@ function applyEvent(state: MeetingState, event: TransportEvent): MeetingState {
     case "reaction":
     case "stt.token":
       return state;
-    case "class.scores":
-      return { ...state, scores: event.scores };
+    case "class.scores": {
+      const scoreChanges: Record<string, number> = {};
+      for (const [id, score] of Object.entries(event.scores)) {
+        scoreChanges[id] = id in state.scores ? score - state.scores[id] : 0;
+      }
+      return { ...state, scores: event.scores, scoreChanges };
+    }
     case "class.coach":
       return { ...state, tips: [...state.tips, event.tip] };
     case "class.phase":

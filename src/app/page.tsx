@@ -1,20 +1,68 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState, type CSSProperties, type FormEvent } from "react";
-import { MdKeyboard, MdVideoCall } from "react-icons/md";
-import { Avatar } from "@/components/Avatar";
+import { useState, type FormEvent } from "react";
+import {
+  MdCallEnd,
+  MdClosedCaption,
+  MdKeyboard,
+  MdMic,
+  MdOutlinePanTool,
+  MdPresentToAll,
+  MdVideoCall,
+  MdVideocam,
+} from "react-icons/md";
 import { Brand } from "@/components/Brand";
+import { Classroom } from "@/components/Classroom";
 import { generateMeetingCode, parseMeetingCode } from "@/lib/identity";
+import { moodFor } from "@/lib/meeting/mood";
+import { STUDENTS } from "@/lib/meeting/students";
+import type { Participant } from "@/lib/meeting/types";
 import { useClock } from "@/lib/useClock";
 import styles from "./page.module.css";
 
-const PREVIEW_STUDENTS = [
-  { name: "Samira", color: "#5c6bc0" },
-  { name: "Marcus", color: "#ef6c00", speaking: true },
-  { name: "Ana", color: "#00897b" },
-  { name: "Priya", color: "#8e24aa" },
+/** A moment from a class, drawn with the real classroom: one student talking, one with a hand up. */
+const PREVIEW: { id: string; status?: Participant["status"]; hand?: boolean; score: number; change?: number }[] = [
+  { id: "marcus", status: "speaking", score: 55 },
+  { id: "ana", score: 68 },
+  { id: "leo", hand: true, score: 28, change: -7 },
+  { id: "priya", score: 33 },
+  { id: "samira", score: 86 },
 ];
+
+const PREVIEW_PEOPLE: Participant[] = [
+  {
+    id: "you",
+    name: "Lecturer",
+    kind: "human",
+    color: "#0b57d0",
+    muted: false,
+    cameraOn: false,
+    handRaisedAt: null,
+    status: "idle",
+  },
+  ...PREVIEW.map(({ id, status, hand }) => {
+    const persona = STUDENTS.find((student) => student.id === id)!;
+    return {
+      id,
+      name: persona.name,
+      kind: "agent" as const,
+      color: persona.color,
+      role: persona.role,
+      muted: false,
+      cameraOn: false,
+      handRaisedAt: hand ? 1 : null,
+      status: status ?? "listening",
+    };
+  }),
+];
+
+const PREVIEW_MOODS = Object.fromEntries(
+  PREVIEW.map(({ id, score, change }) => [id, moodFor(id, score, change)!]),
+);
+
+const noop = () => {};
+const silent = () => null;
 
 export default function Home() {
   const router = useRouter();
@@ -40,8 +88,8 @@ export default function Home() {
         <section className={styles.copy}>
           <h1>Practise teaching on a class of AI students</h1>
           <p>
-            Teach a computer science topic to students who react to how you explain it, then get a
-            coaching debrief.
+            Step into a lecture hall of students who listen, raise their hands when they&apos;re lost, and react
+            to how well you explain things. Then get a coaching debrief on what landed and what didn&apos;t.
           </p>
 
           <div className={styles.actions}>
@@ -74,20 +122,56 @@ export default function Home() {
             </form>
           </div>
           {invalid && <p className={styles.error}>That doesn&apos;t look like a class code.</p>}
+
         </section>
 
-        <section className={styles.preview} aria-hidden="true">
-          {PREVIEW_STUDENTS.map((student) => (
-            <div
-              key={student.name}
-              className={styles.previewTile}
-              data-speaking={student.speaking}
-              style={{ "--c": student.color } as CSSProperties}
-            >
-              <Avatar name={student.name} color={student.color} size={56} />
-              <span>{student.name}</span>
+        {/* The real classroom, as a still picture: hidden from assistive tech and not interactive. */}
+        <section className={styles.preview} aria-hidden="true" inert>
+          <div className={styles.window}>
+            <div className={styles.windowBar}>
+              <span>Recursion</span>
+              <span className={styles.live}>Live</span>
             </div>
-          ))}
+            <div className={styles.hall}>
+              <Classroom
+                participants={PREVIEW_PEOPLE}
+                localId="you"
+                camStream={null}
+                pinnedId={null}
+                studentLevel={silent}
+                micLevel={0}
+                moods={PREVIEW_MOODS}
+                onShowPeople={noop}
+                onTogglePin={noop}
+                onSetMuted={noop}
+                onRemove={noop}
+              />
+              <div className={styles.caption}>
+                <strong>Marcus</strong>
+                Isn&apos;t recursion basically just a loop with extra steps?
+              </div>
+            </div>
+            <div className={styles.controls}>
+              <i>
+                <MdMic />
+              </i>
+              <i>
+                <MdVideocam />
+              </i>
+              <i>
+                <MdPresentToAll />
+              </i>
+              <i>
+                <MdClosedCaption />
+              </i>
+              <i>
+                <MdOutlinePanTool />
+              </i>
+              <i className={styles.end}>
+                <MdCallEnd />
+              </i>
+            </div>
+          </div>
         </section>
       </main>
     </div>

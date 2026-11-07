@@ -4,12 +4,15 @@ import { useRef, type CSSProperties } from "react";
 import { MdPresentToAll } from "react-icons/md";
 import type { Participant } from "@/lib/meeting/types";
 import { useGridLayout } from "@/lib/useGridLayout";
+import type { Mood } from "@/lib/meeting/mood";
+import type { LevelReader } from "@/lib/voice/useStudentVoices";
 import { Avatar } from "./Avatar";
+import { Classroom } from "./Classroom";
 import { ParticipantTile, type TileActions } from "./ParticipantTile";
 import { VideoStream } from "./VideoStream";
 import styles from "./Stage.module.css";
 
-export type Layout = "tiled" | "spotlight";
+export type Layout = "classroom" | "tiled" | "spotlight";
 
 const GAP = 8;
 
@@ -21,6 +24,12 @@ interface StageProps extends TileActions {
   layout: Layout;
   pinnedId: string | null;
   lastSpeakerId: string | null;
+  /** Loudness of each student's voice, for the classroom's speaking visualiser. */
+  studentLevel: LevelReader;
+  /** The local microphone level, in steps from 0 to 3. */
+  micLevel: number;
+  /** How each student is feeling, by id. Empty when the viewer shouldn't see it. */
+  moods: Record<string, Mood>;
   /** Says whether the class can see what's being presented. */
   presentingNote: string;
   onStopPresenting: () => void;
@@ -64,6 +73,25 @@ export function Stage(props: StageProps) {
     );
   }
 
+  if (layout === "classroom") {
+    return (
+      <Classroom
+        participants={participants}
+        localId={localId}
+        camStream={props.camStream}
+        pinnedId={pinnedId}
+        studentLevel={props.studentLevel}
+        micLevel={props.micLevel}
+        moods={props.moods}
+        onShowPeople={props.onShowPeople}
+        onTogglePin={props.onTogglePin}
+        onSetMuted={props.onSetMuted}
+        onRemove={props.onRemove}
+        onCallOn={props.onCallOn}
+      />
+    );
+  }
+
   return <TiledGrid {...props} />;
 }
 
@@ -73,10 +101,12 @@ function tileProps(props: StageProps, participant: Participant) {
     participant,
     isLocal,
     isPinned: participant.id === props.pinnedId,
+    mood: props.moods[participant.id],
     stream: isLocal ? props.camStream : null,
     onTogglePin: props.onTogglePin,
     onSetMuted: props.onSetMuted,
     onRemove: props.onRemove,
+    onCallOn: props.onCallOn,
   };
 }
 

@@ -10,6 +10,7 @@ import {
   MdClosedCaptionOff,
   MdFullscreen,
   MdFullscreenExit,
+  MdEventSeat,
   MdGridView,
   MdKeyboardArrowUp,
   MdMic,
@@ -202,6 +203,16 @@ export function ControlBar({
           </RoundButton>
           {popover === "more" && (
             <div className={`${styles.menu} ${styles.moreMenu}`} role="menu">
+              <MenuItem
+                icon={<MdEventSeat />}
+                checked={layout === "classroom"}
+                onClick={() => {
+                  onLayout("classroom");
+                  setPopover(null);
+                }}
+              >
+                Classroom layout
+              </MenuItem>
               <MenuItem
                 icon={<MdGridView />}
                 checked={layout === "tiled"}
