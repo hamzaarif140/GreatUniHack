@@ -36,7 +36,7 @@ export class ScriptedBrain implements AgentBrain {
     const deltas: Record<string, number> = {};
     const reasonMap: Record<string, string> = {};
     for (const { persona } of students) {
-      // Beginners feel jargon most, and experienced students feel it least.
+      // Beginners feel jargon most, and experienced students feel it least. Aptitude is applied by the room.
       const sensitivity = change < 0 ? 1.5 - persona.baseScore / 100 : 1;
       deltas[persona.id] = Math.round(change * sensitivity);
       reasonMap[persona.id] = reason;

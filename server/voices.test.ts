@@ -207,13 +207,16 @@ test("in class, spoken lines carry an audio path that works", async () => {
   };
   await until((event) => event.type === "participant.joined");
 
-  // A question makes the scripted Marcus answer.
-  socket.send(JSON.stringify({ type: "class.say", text: "Who can tell me what recursion is?" }));
+  // Asked by name, the scripted Marcus answers straight away.
+  socket.send(JSON.stringify({ type: "class.say", text: "Marcus, can you tell me what recursion is?" }));
   const speech = await until((event) => event.type === "speech");
   assert.ok(speech.type === "speech" && speech.cue.audioPath);
 
-  const reply = await fetch(`http://127.0.0.1:${port}${speech.cue.audioPath}`);
+  const reply = await fetch(`http://127.0.0.1:${port}${speech.cue.audioPath}`, {
+    headers: { origin: "http://localhost:3000" },
+  });
   assert.equal(reply.status, 200);
+  assert.equal(reply.headers.get("access-control-allow-origin"), "http://localhost:3000", "the page may measure it");
   await reply.text();
   assert.equal(api.speech[0].body.text, speech.cue.text);
 });

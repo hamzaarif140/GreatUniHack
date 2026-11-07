@@ -62,22 +62,27 @@ Ending the class builds the **debrief**. Stats are computed in code, and the coa
 | `src/lib/voice/` | Live transcription, push-to-talk fallback, voice playback |
 | `src/lib/media/` | Mic, camera and screen streams, and screen snapshots |
 | `src/components/MeetingRoom.tsx` | The in-call screen; most UI wiring is here |
+| `src/components/Classroom.tsx`, `VoiceVisualizer.tsx` | The default lecture-hall layout, and the ring that pulses with a speaking voice |
 | `src/components/DebriefScreen.tsx` | The debrief |
 
 ## Rules that aren't obvious
 
 **Protocol:** when adding a message, update `types.ts`, `server/validate.ts` (all socket input is untrusted and checked field by field), the reducer in `useMeeting.ts`, and tests.
 
-**Privacy of scores:** scores, coaching tips and the debrief go only to the lecturer, through `toLecturer`. The first person to join is the lecturer, and only they can teach or manage students. Anyone else in the room is an observer whose words don't affect the class.
+**Privacy of scores:** scores, coaching tips and the debrief go only to the lecturer, through `toLecturer`. Student mood emoji (`src/lib/meeting/mood.ts`) are worked out from the scores in the browser, so they're shown only to the lecturer and hidden in realistic mode. The first person to join is the lecturer, and only they can teach or manage students. Anyone else in the room is an observer whose words don't affect the class.
 
 **Student behaviour:**
 - Students stay in character, never act as helpful assistants, and don't explain better than their score allows.
 - Personas are fictional and must stay respectful. Ana's background shows up as asking about idioms, never as broken English. Don't turn a background into a joke or the cause of struggling.
+- Each student has an `aptitude` (1-5) separate from their starting score. It scales score changes in `room.ts` (`LEARNING_RATE`) and sets how they reason in the prompts. Keep a spread of abilities, and don't stack low ability onto a student who is already shown struggling for another reason.
 - Debrief feedback must cite real transcript lines, and the tone is a mentor's, not a grader's. This is practice, not a formal assessment.
+
+**Hands and chaos:** in a cooperative or typical class, a student the orchestrator picks raises a hand instead of speaking, keen students raise one after a question, and a student who just got confused (a drop of 5, or 8 for quiet students, or falling below 30) raises one to ask. Saying their name or the `agent.callOn` command (clicking the hand) lets them speak what they raised it for. A hand left up for 4 lecturer turns goes down, and an ignored confused hand becomes a missed signal. Greetings and chat are answered directly. In a chaotic class nobody raises a hand: the chosen student speaks, another may talk over them, and someone may call out unprompted (`random` in `RoomOptions` makes this testable).
 
 **Speech:**
 - `speakable()` in `room.ts` removes stage directions and caps replies at 35 words. It only strips brackets that stand alone, because code and maths like `O(n)` and `arr[i]` must survive. This matters in a computer science class.
 - A student's transcript line is added when they *start* talking and holds only the words said so far, so interruptions land in the right order.
+- `/speech/<id>` sends a CORS header for allowed origins, so the page can measure the voice for the visualiser. A suspended audio context isn't used, because routing through it would silence the voice; the ring then animates on its own.
 - The mic is gated while a student's voice plays, so the class can't hear itself, and loud speech over a student cuts them off. See `useLiveTranscription.ts` and `useStudentVoices.ts`.
 
 **Claude API:**

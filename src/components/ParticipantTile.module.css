@@ -124,9 +124,14 @@
   width: 30px;
   height: 30px;
   border-radius: 50%;
-  background: var(--toggle-on);
-  color: var(--toggle-on-fg);
+  background: #fbbc04;
+  color: #3c2a00;
   font-size: 18px;
+  z-index: 2;
+}
+
+button.hand:hover {
+  background: #fdd663;
 }
 
 .indicator {
@@ -250,4 +255,20 @@
   .actions {
     display: none;
   }
+}
+
+/* How a student feels, shown to the lecturer. */
+.mood {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 92%);
+  font-size: 19px;
+  line-height: 1;
 }

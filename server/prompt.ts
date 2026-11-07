@@ -25,10 +25,19 @@ function misconceptionFor(persona: StudentPersona, config: ClassConfig) {
 function describeDifficulty(config: ClassConfig) {
   if (config.difficulty === "cooperative") return "Today the class is engaged and patient.";
   if (config.difficulty === "chaotic") {
-    return "It's a tired Friday afternoon. Attention wanders and people are more easily distracted.";
+    return "It's a tired Friday afternoon. Attention wanders, people are easily distracted, nobody bothers raising a hand, and people call out and talk over each other.";
   }
   return "It's an ordinary class.";
 }
+
+/** How reasoning sounds at each level of ability. */
+const ABILITY_VOICE: Record<StudentPersona["aptitude"], string> = {
+  1: "use plain, everyday words, take one step at a time, and don't make leaps or generalise.",
+  2: "reason from examples you've seen rather than principles, and miss the deeper why.",
+  3: "follow clear steps and apply them to a similar case, without going much further.",
+  4: "reason carefully and precisely, and connect ideas to what you already know.",
+  5: "reason several steps ahead, ask about edge cases and trade-offs, and notice gaps quickly.",
+};
 
 /** Kept stable per student and class, so it can be served from the prompt cache. */
 export function buildStudentSystem(persona: StudentPersona, config: ClassConfig) {
@@ -38,11 +47,13 @@ Your background: ${persona.description}
 Your personality: ${persona.personality}
 How you talk: ${persona.speakingStyle}
 How you show confusion: ${persona.confusionSignal}
+How you think (your ability in this subject, ${persona.aptitude} out of 5): ${persona.thinking}
 ${misconceptionFor(persona, config)}
 
 Staying in character:
 - You are a student who is still learning, and never a helpful assistant. Don't explain the topic better than you currently understand it, and don't summarise the lesson.
 - Your understanding is given to you each turn. Keep your reply consistent with it: if it's low, you really don't get this yet.
+- Your ability sets how you reason and the words you use, whatever your understanding. A high score means you've followed this lesson, not that you've become a different thinker. At ${persona.aptitude} out of 5, ${ABILITY_VOICE[persona.aptitude]}
 - Your background shapes how you think. It isn't a joke or a stereotype, and you always have dignity and real ability.
 - This is a live spoken conversation, and a voice reads your words aloud. Respond to what the lecturer just said to you. Listen and answer; don't recite.
 - Keep it under 25 words, as people do when talking in class. Use only words to be spoken: no lists, speaker labels, or stage directions such as "(pause)". Don't begin with "um" or similar unless you're really unsure or that's how you talk; most students just say what they think.
@@ -94,6 +105,7 @@ Scoring. Give each student a change in understanding from -15 to 15, judged sepa
 - It falls with unexplained jargon, skipped steps, long explanations with no check, answers that don't address the question, and factual errors.
 - Small talk and classroom management change little, so use 0.
 - Scores already show where each student stands. Don't reward a statement that only sounds good.
+- Judge each student at their ability: an explanation that works for a strong student can lose a weaker one, and a slow, basic one can bore a strong student. Ability also scales the change after you, so judge only how well it suited them.
 
 Choosing who reacts. One student at most, or "none":
 - If the lecturer greets the class or asks a real question, including one about what's on their screen, someone answers, since a class that ignores you feels broken.
@@ -103,6 +115,7 @@ Choosing who reacts. One student at most, or "none":
 - A quiet student speaks only when asked directly, or after a long time.
 - A talkative student may interrupt off-topic now and then, more often in a chaotic class.
 - Choose "none" when nobody would naturally speak, such as after a clear statement that needs no reply.
+- In a cooperative or typical class, the student you choose doesn't speak straight away: they raise their hand and wait to be called on, so choose whoever would want to say something, and write the intent as what they want to say. In a chaotic class nobody raises a hand; the student you choose just speaks.
 
 The lecturer's words come from live speech recognition, so overlook small transcription errors rather than scoring them as poor teaching.
 
@@ -116,7 +129,7 @@ export function buildAssessPrompt({ config, students, transcript, latest }: Asse
   const roster = students
     .map(
       ({ persona, score, quietTurns }) =>
-        `- ${persona.id} (${persona.name}): understanding ${score}/100, quiet for ${quietTurns} turns, eagerness ${persona.eagerness}. ${persona.personality} Shows confusion by: ${persona.confusionSignal}`,
+        `- ${persona.id} (${persona.name}): understanding ${score}/100, ability ${persona.aptitude}/5, quiet for ${quietTurns} turns, eagerness ${persona.eagerness}. ${persona.personality} Thinks: ${persona.thinking} Shows confusion by: ${persona.confusionSignal}`,
     )
     .join("\n");
   return `Topic: ${config.topic}. Class mood: ${config.difficulty}.

@@ -73,8 +73,9 @@ afterEach(async () => {
   await Promise.all(servers.splice(0).map((server) => server.close()));
 });
 
-async function startServer(brain: AgentBrain, limits = LIMITS, autoJoinIds = ["marcus", "priya"]) {
-  const server = createMeetingServer({ brain, allowedOrigins: [ORIGIN], timing: FAST, limits, autoJoinIds });
+/** Chance never fires unless a test says so, which keeps chaotic classes predictable. */
+async function startServer(brain: AgentBrain, limits = LIMITS, autoJoinIds = ["marcus", "priya"], random = () => 1) {
+  const server = createMeetingServer({ brain, allowedOrigins: [ORIGIN], timing: FAST, limits, autoJoinIds, random });
   servers.push(server);
   return server.listen(0, "127.0.0.1");
 }
@@ -127,9 +128,13 @@ const lastScores = (client: Client) =>
     | undefined;
 const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function classWithStudents(brain: AgentBrain, limits = LIMITS) {
+/** Students in a chaotic class speak straight away, so most tests use one. */
+const CHAOTIC = { topic: "Recursion", difficulty: "chaotic" };
+const TYPICAL = { topic: "Recursion", difficulty: "typical" };
+
+async function classWithStudents(brain: AgentBrain, limits = LIMITS, config: unknown = CHAOTIC) {
   const port = await startServer(brain, limits);
-  const lecturer = await connect(port, "lecturer");
+  const lecturer = await connect(port, "lecturer", config);
   await lecturer.waitFor(joined("priya"));
   return { port, lecturer };
 }
@@ -165,12 +170,120 @@ test("scores change only with the assessment, and stay private to the lecturer",
 
   const scores = lastScores(lecturer)?.scores;
   assert.equal(scores?.priya, start + 10);
-  assert.equal(scores?.marcus, 55 - 15, "a change is capped at 15");
+  assert.equal(scores?.marcus, 45 - 15, "a change is capped at 15");
 
   const snapshot = observer.events[0];
   assert.ok(snapshot.type === "snapshot");
   assert.deepEqual(snapshot.scores, {});
   assert.ok(!observer.events.some((event) => event.type === "class.scores"));
+});
+
+test("able students learn faster and are knocked back less", async () => {
+  const brain = new FakeBrain();
+  const port = await startServer(brain, LIMITS, ["leo", "samira"]);
+  const lecturer = await connect(port, "lecturer");
+  await lecturer.waitFor(joined("samira"));
+  await pause(20);
+  const start = lastScores(lecturer)?.scores ?? {};
+
+  brain.verdict = { deltas: { leo: 8, samira: 8 } };
+  lecturer.send({ type: "class.say", text: "For example, picture a stack of plates." });
+  await pause(50);
+  const gained = lastScores(lecturer)?.scores ?? {};
+  assert.equal(gained.leo - start.leo, 4, "aptitude 1 gains half");
+  assert.equal(gained.samira - start.samira, 12, "aptitude 5 gains half again");
+
+  brain.verdict = { deltas: { leo: -10, samira: -10 } };
+  lecturer.send({ type: "class.say", text: "The amortized invariant follows trivially." });
+  await pause(50);
+  const lost = lastScores(lecturer)?.scores ?? {};
+  assert.equal(lost.leo - gained.leo, -14);
+  assert.equal(lost.samira - gained.samira, -7);
+});
+
+const handOf = (client: Client, id: string) =>
+  client.events
+    .filter((e) => e.type === "participant.updated" && e.id === id && "handRaisedAt" in e.patch)
+    .map((e) => (e.type === "participant.updated" ? e.patch.handRaisedAt : undefined))
+    .at(-1);
+
+test("in an orderly class, a student who wants to speak raises a hand and waits", async () => {
+  const brain = new FakeBrain();
+  const { lecturer } = await classWithStudents(brain, LIMITS, TYPICAL);
+  brain.verdict = { nextSpeakerId: "marcus", intent: "say it's just a loop" };
+  lecturer.send({ type: "class.say", text: "Recursion is when a function calls itself." });
+  await lecturer.waitFor((e) => e.type === "participant.updated" && e.id === "marcus" && typeof e.patch.handRaisedAt === "number");
+  await pause(40);
+  assert.equal(brain.replies.length, 0, "nobody speaks until called on");
+
+  brain.verdict = {};
+  lecturer.send({ type: "class.say", text: "Yes, Marcus?" });
+  await lecturer.waitFor((e) => e.type === "caption" && e.speakerId === "marcus" && e.final);
+  assert.match(brain.replies[0].intent, /hand up[\s\S]*say it's just a loop/);
+  assert.equal(handOf(lecturer, "marcus"), null, "speaking lowers the hand");
+});
+
+test("a greeting is answered without a hand going up", async () => {
+  const brain = new FakeBrain();
+  const { lecturer } = await classWithStudents(brain, LIMITS, TYPICAL);
+  brain.verdict = { nextSpeakerId: "marcus", intent: "say hi" };
+  lecturer.send({ type: "class.say", text: "Hi everyone, welcome." });
+  await lecturer.waitFor((e) => e.type === "caption" && e.speakerId === "marcus" && e.final);
+});
+
+test("a confused student puts a hand up, and calling on them lets them ask", async () => {
+  const brain = new FakeBrain();
+  const { lecturer } = await classWithStudents(brain, LIMITS, TYPICAL);
+  brain.verdict = { deltas: { marcus: -8 }, reasons: { marcus: "unexplained jargon" } };
+  lecturer.send({ type: "class.say", text: "The stack frame unwinds after the base case." });
+  await lecturer.waitFor((e) => e.type === "participant.updated" && e.id === "marcus" && typeof e.patch.handRaisedAt === "number");
+  assert.equal(brain.replies.length, 0);
+
+  lecturer.send({ type: "agent.callOn", id: "marcus" });
+  await lecturer.waitFor((e) => e.type === "caption" && e.speakerId === "lecturer" && e.text === "Go ahead, Marcus.");
+  await lecturer.waitFor((e) => e.type === "caption" && e.speakerId === "marcus" && e.final);
+  assert.match(brain.replies[0].intent, /confused \(unexplained jargon\)/);
+});
+
+test("quiet students only put a hand up when they're really lost", async () => {
+  const brain = new FakeBrain();
+  const { lecturer } = await classWithStudents(brain, LIMITS, TYPICAL);
+  brain.verdict = { deltas: { priya: 20 } };
+  lecturer.send({ type: "class.say", text: "Think of nested boxes." });
+  await pause(30);
+  brain.verdict = { deltas: { priya: -5 } };
+  lecturer.send({ type: "class.say", text: "Moving on quickly." });
+  await pause(50);
+  assert.equal(handOf(lecturer, "priya"), undefined, "a small drop isn't enough for her");
+
+  brain.verdict = { deltas: { priya: -9 } };
+  lecturer.send({ type: "class.say", text: "And the stack frame unwinds." });
+  await lecturer.waitFor((e) => e.type === "participant.updated" && e.id === "priya" && typeof e.patch.handRaisedAt === "number");
+});
+
+test("an ignored confused hand goes down after a while and counts as a missed signal", async () => {
+  const brain = new FakeBrain();
+  const { lecturer } = await classWithStudents(brain, LIMITS, TYPICAL);
+  brain.verdict = { deltas: { marcus: -8 } };
+  lecturer.send({ type: "class.say", text: "The stack frame unwinds." });
+  await lecturer.waitFor((e) => e.type === "participant.updated" && e.id === "marcus" && typeof e.patch.handRaisedAt === "number");
+  brain.verdict = {};
+  for (const text of ["One.", "Two.", "Three.", "Four."]) lecturer.send({ type: "class.say", text });
+  await lecturer.waitFor((e) => e.type === "participant.updated" && e.id === "marcus" && e.patch.handRaisedAt === null);
+  assert.equal(brain.replies.length, 0);
+});
+
+test("in a chaotic class nobody raises a hand, and someone may talk over the speaker", async () => {
+  const brain = new FakeBrain();
+  const port = await startServer(brain, LIMITS, ["marcus", "priya"], () => 0);
+  const lecturer = await connect(port, "lecturer", CHAOTIC);
+  await lecturer.waitFor(joined("priya"));
+  brain.verdict = { nextSpeakerId: "marcus", deltas: { marcus: -10 } };
+  lecturer.send({ type: "class.say", text: "Recursion is when a function calls itself." });
+  await lecturer.waitFor((e) => e.type === "caption" && e.speakerId === "priya" && e.final);
+  assert.deepEqual(brain.replies.map((r) => r.student.persona.id), ["marcus", "priya"]);
+  assert.match(brain.replies[1].intent, /without being asked/);
+  assert.equal(handOf(lecturer, "marcus"), undefined, "no hands in chaos");
 });
 
 test("only the chosen student replies, with their understanding in the request", async () => {
@@ -414,7 +527,7 @@ test("the debrief has the history and stats, and drops feedback citing lines tha
   assert.equal(debrief.lecturerWords, 8);
 
   const priya = debrief.students.find((student) => student.id === "priya");
-  assert.deepEqual(priya?.history.map((point) => point.score), [30, 35]);
+  assert.deepEqual(priya?.history.map((point) => point.score), [20, 25]);
   const marcus = debrief.students.find((student) => student.id === "marcus");
   assert.equal(marcus?.turns, 1);
 
